@@ -14,8 +14,8 @@ def analyze_guesses(guesses_df, correct_answers):
 
     for _, row in guesses_df.iterrows():
         participant_id = row["Serial ID"]
-        # Process races (Race1 to Race7)
-        for race_num in range(1, 8):
+        # Process races (Race2 to Race7)
+        for race_num in range(2, 8):
             actual_1st = str(correct_answers.get(f"Race{race_num}_1st", "0")).strip()
             actual_2nd = str(correct_answers.get(f"Race{race_num}_2nd", "0")).strip()
             actual_3rd = str(correct_answers.get(f"Race{race_num}_3rd", "0")).strip()
@@ -295,14 +295,15 @@ with st.sidebar:
     MAX_TOTAL_POINTS = 0  # Will calculate based on valid races and opts
 
     # Color palette for race containers
-    colors = ['#ffecec', '#ecffec', '#ecebff', '#fff6ec', '#f6ecff', '#ecfff6', '#ececff']
+    colors = ['#ffecec', '#ecffec', '#ecebff', '#fff6ec', '#f6ecff', '#ecfff6']
 
-    for race_num in range(1, 8):
+    # Start from Race 2
+    for race_num in range(2, 8):
         # Create a unique container for each race with different styling
         with st.container():
             st.markdown(f"""
                 <div style="
-                    background-color: {colors[(race_num-1)%len(colors)]};
+                    background-color: {colors[(race_num-2)%len(colors)]};
                     padding: 15px;
                     border-radius: 10px;
                     margin: 10px 0;
@@ -356,7 +357,7 @@ with st.sidebar:
                 border: 1px solid rgba(49, 51, 63, 0.2);
                 box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             ">
-                <h3 style="color: #333; margin-bottom: 10px; font-size: 1.1em;">Opts</h3>
+                <h3 style="color: #333; margin-bottom: 10px; font-size: 1.1em;"><h3 style="color: #333; margin-bottom: 10px; font-size: 1.1em;">Opts</h3>
             </div>
             """, unsafe_allow_html=True)
 
@@ -380,7 +381,7 @@ else:
         detailed_results_df = analyze_guesses(guesses_df, correct_answers)
 
         # Filter detailed_results_df to only include races and opts where correct answers are provided
-        valid_races = [f"Race {i}" for i in range(1, 8) if (
+        valid_races = [f"Race {i}" for i in range(2, 8) if (  # Start from Race 2
             correct_answers.get(f"Race{i}_1st", "0") != "0" or
             correct_answers.get(f"Race{i}_2nd", "0") != "0" or
             correct_answers.get(f"Race{i}_3rd", "0") != "0")]
@@ -390,7 +391,9 @@ else:
 
         with st.container():
             st.subheader("Detailed Results")
-            st.dataframe(filtered_df)
+            # Display only Serial ID and Points columns
+            simplified_df = filtered_df[['Serial ID', 'Points']]
+            st.dataframe(simplified_df)
 
             st.divider()
 
@@ -405,8 +408,8 @@ else:
         # Initialize top_scorers_dict
         top_scorers_dict = {}
 
-        # Process Races 1, 4, 5, 6, 7 individually
-        for race_num in [1, 4, 5, 6, 7]:
+        # Process Races 4, 5, 6, 7 individually
+        for race_num in [4, 5, 6, 7]:
             race_name = f"Race {race_num}"
             race_df = filtered_df[filtered_df['Race'] == race_name]
             if not race_df.empty:
@@ -435,17 +438,23 @@ else:
                 st.session_state.lucky_draw_winners['Races 2 & 3 - 40 Points'] = winner
                 st.session_state.all_lucky_draw_winners.update(winner)
             else:
-                races_2_3_points = races_2_3_points[races_2_3_points['Points'] > 0]
-                races_2_3_points = races_2_3_points[~races_2_3_points['Serial ID'].isin(st.session_state.all_lucky_draw_winners)]
-                if not races_2_3_points.empty:
-                    top_points = races_2_3_points['Points'].unique()
-                    top_points.sort()
-                    top_points = top_points[::-1][:7]
-                    for points in top_points:
-                        category_name = f"Races 2 & 3 - {points} Points"
-                        participants = races_2_3_points[races_2_3_points['Points'] == points]['Serial ID'].tolist()
-                        if participants:
-                            top_scorers_dict.setdefault(category_name, []).extend(participants)
+                high_scorers = races_2_3_points[races_2_3_points['Points'] > 27]
+                if high_scorers.empty:
+                    st.warning("No participants scored more than 27 points in Races 2 & 3 combined.")
+                    max_points = races_2_3_points['Points'].max()
+                    if max_points > 0:
+                        st.info(f"Highest score achieved: {max_points} points")
+                else:
+                    high_scorers = high_scorers[~high_scorers['Serial ID'].isin(st.session_state.all_lucky_draw_winners)]
+                    if not high_scorers.empty:
+                        top_points = high_scorers['Points'].unique()
+                        top_points.sort()
+                        top_points = top_points[::-1][:7]
+                        for points in top_points:
+                            category_name = f"Races 2 & 3 - {points} Points"
+                            participants = high_scorers[high_scorers['Points'] == points]['Serial ID'].tolist()
+                            if participants:
+                                top_scorers_dict.setdefault(category_name, []).extend(participants)
 
         # Process OPTs
         opts_df = filtered_df[filtered_df['Race'].str.startswith('OPT')]
@@ -502,7 +511,7 @@ else:
                         <p style='color: #ffffff;
                                 font-size: 16px;
                                 margin: 5px 0;'>
-                            Remaining participants:
+                             Participants:
                         </p>
                         {'<br>'.join([f'<span style="color: #ffffff;">• {participant}</span>' for participant in participants_remaining])}
                     </div>
