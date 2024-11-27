@@ -432,8 +432,6 @@ else:
                     for points in top_points:
                         category_name = f"{race_name} - {points} Points"
                         participants = race_points[race_points['Points'] == points]['Serial ID'].tolist()
-                        # Exclude overall lucky draw winners
-                        participants = [p for p in participants if p not in st.session_state.all_lucky_draw_winners]
                         if participants:
                             top_scorers_dict.setdefault(category_name, []).extend(participants)
 
@@ -444,8 +442,6 @@ else:
             if any(races_2_3_points['Points'] == 40):
                 winner = races_2_3_points[races_2_3_points['Points'] == 40]['Serial ID'].tolist()
                 st.success(f"Winner for Races 2 & 3 with 40 points: {', '.join(map(str, winner))}")
-                st.session_state.lucky_draw_winners['Races 2 & 3 - 40 Points'] = winner
-                st.session_state.all_lucky_draw_winners.update(winner)
             else:
                 high_scorers = races_2_3_points[races_2_3_points['Points'] > 27]
                 if high_scorers.empty:
@@ -454,16 +450,14 @@ else:
                     if max_points > 0:
                         st.info(f"Highest score achieved: {max_points} points")
                 else:
-                    high_scorers = high_scorers[~high_scorers['Serial ID'].isin(st.session_state.all_lucky_draw_winners)]
-                    if not high_scorers.empty:
-                        top_points = high_scorers['Points'].unique()
-                        top_points.sort()
-                        top_points = top_points[::-1][:7]
-                        for points in top_points:
-                            category_name = f"Races 2 & 3 - {points} Points"
-                            participants = high_scorers[high_scorers['Points'] == points]['Serial ID'].tolist()
-                            if participants:
-                                top_scorers_dict.setdefault(category_name, []).extend(participants)
+                    top_points = high_scorers['Points'].unique()
+                    top_points.sort()
+                    top_points = top_points[::-1][:7]
+                    for points in top_points:
+                        category_name = f"Races 2 & 3 - {points} Points"
+                        participants = high_scorers[high_scorers['Points'] == points]['Serial ID'].tolist()
+                        if participants:
+                            top_scorers_dict.setdefault(category_name, []).extend(participants)
 
         # Process OPTs
         opts_df = filtered_df[filtered_df['Race'].str.startswith('OPT')]
@@ -478,7 +472,6 @@ else:
                 for points in top_points:
                     category_name = f"OPTs Total - {points} Points"
                     participants = opts_points[opts_points['Points'] == points]['Serial ID'].tolist()
-                    participants = [p for p in participants if p not in st.session_state.all_lucky_draw_winners]
                     if participants:
                         top_scorers_dict.setdefault(category_name, []).extend(participants)
 
@@ -491,42 +484,28 @@ else:
             for participant in participants:
                 st.write(f"- {participant}")
 
-            # Keep last remaining people in the list without removing them
-            min_remaining = 1  # Number of participants to remain after lucky draws
-            participants_remaining = st.session_state.get(f"{category}_remaining", participants.copy())
+            # Initialize or get winners list
             winners = st.session_state.lucky_draw_winners.get(category, [])
 
-            if len(participants_remaining) > min_remaining:
-                if st.button(f"Conduct Lucky Draw for {category}"):
-                    winner = random.choice(participants_remaining)
-                    winners.append(winner)
-                    participants_remaining.remove(winner)
-                    st.session_state.lucky_draw_winners[category] = winners
-                    st.session_state[f"{category}_remaining"] = participants_remaining
-                    st.session_state.all_lucky_draw_winners.add(winner)
-                    st.success(f"Lucky Draw Winner for {category}: {winner}")
-            else:
-                st.markdown(f"""
-                    <div style='background-color: #2a2a2a;
-                              padding: 20px;
-                              border-radius: 10px;
-                              border: 2px solid #dc3545;
-                              margin: 10px 0;'>
-                        <h3 style='color: #dc3545;
-                                 font-size: 20px;
-                                 margin-bottom: 10px;'>
-                            Winner in {category} category
-                        </h3>
-                        <p style='color: #ffffff;
-                                font-size: 16px;
-                                margin: 5px 0;'>
-                             Participants:
-                        </p>
-                        {'<br>'.join([f'<span style="color: #ffffff;">• {participant}</span>' for participant in participants_remaining])}
-                    </div>
-                """, unsafe_allow_html=True)
+            # Get eligible participants (exclude previous winners)
+            eligible_participants = [p for p in participants if p not in winners]
 
-        st.divider()
+            # Conduct Lucky Draw
+            if st.button(f"Conduct Lucky Draw for {category}") and eligible_participants:
+                winner = random.choice(eligible_participants)
+                winners.append(winner)
+                st.session_state.lucky_draw_winners[category] = winners
+                st.success(f"Lucky Draw Winner for {category}: {winner}")
+            elif not eligible_participants:
+                st.warning("No eligible participants remaining for lucky draw")
+
+            # Display all winners
+            if winners:
+                st.write(f"**Lucky Draw Winners for {category}:**")
+                for w in winners:
+                    st.write(f"- {w}")
+
+            st.divider()
 
         # Analyze Specific Participant
         st.subheader("Analyze Specific Participant")
