@@ -283,7 +283,7 @@ create_header_with_logo()
 add_sidebar_logo()
 
 st.title("🏇 AESGC Race Predictor Pro")
-st.write("changedddthe participant guesses file and enter the correct answers to analyze results.")
+st.write("Upload the participant guesses file and enter the correct answers to analyze results.")
 
 # Sidebar for file upload and race inputs
 with st.sidebar:
