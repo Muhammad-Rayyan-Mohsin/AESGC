@@ -363,7 +363,7 @@ with st.sidebar:
             """, unsafe_allow_html=True)
 
         opt_cols = st.columns(7)
-        for idx, i in enumerate(range(1, 8)):
+        for idx, i in enumerate(range(3, 10)):
             with opt_cols[idx]:
                 correct_answers[f"OPT{i}"] = st.text_input(
                     f"OPT{i}",
