@@ -8,7 +8,6 @@ import random
 from PIL import Image
 import os
 
-
 def analyze_guesses(guesses_df, correct_answers):
     detailed_results = []
 
@@ -68,7 +67,6 @@ def analyze_guesses(guesses_df, correct_answers):
             })
 
     return pd.DataFrame(detailed_results)
-
 
 def create_pdf(filtered_df, correct_summary, top_scorers_dict, lucky_draw_winners):
     from reportlab.lib.colors import HexColor
@@ -153,7 +151,6 @@ def create_pdf(filtered_df, correct_summary, top_scorers_dict, lucky_draw_winner
     buffer.seek(0)
     return buffer
 
-
 def create_header_with_logo():
     st.markdown("""
         <style>
@@ -169,37 +166,36 @@ def create_header_with_logo():
         }
         </style>
     """, unsafe_allow_html=True)
-    
+
     col1, col2 = st.columns([1, 4])
     with col1:
         try:
             base_dir = os.path.dirname(os.path.abspath(__file__))
             logo_path = os.path.join(base_dir, 'pic.png')
             image = Image.open(logo_path)
-            
+
             if image.mode not in ('RGBA', 'RGB'):
                 image = image.convert('RGBA')
-            
+
             original_width, original_height = image.size
             target_width = 300
             aspect_ratio = original_height / original_width
             target_height = int(target_width * aspect_ratio)
-            
+
             image = image.resize((target_width, target_height), Image.Resampling.LANCZOS)
-            
-            st.image(image, 
+
+            st.image(image,
                     use_column_width=False,
                     width=target_width,
                     output_format='PNG',
                     clamp=False)
-            
+
         except Exception as e:
             st.error(f"Error loading logo: {str(e)}")
-            
+
     with col2:
         st.title("")
         st.write("")
-
 
 def add_sidebar_logo():
     st.markdown("""
@@ -212,29 +208,28 @@ def add_sidebar_logo():
         }
         </style>
     """, unsafe_allow_html=True)
-    
+
     with st.sidebar:
         st.markdown('<div class="sidebar-logo">', unsafe_allow_html=True)
         try:
             image = Image.open('pic2.png')
-            
+
             if image.mode not in ('RGBA', 'RGB'):
                 image = image.convert('RGBA')
-            
+
             target_width = 200
             aspect_ratio = image.height / image.width
             target_height = int(target_width * aspect_ratio)
-            
+
             image = image.resize((target_width, target_height), Image.Resampling.LANCZOS)
-            
-            st.image(image, 
+
+            st.image(image,
                     use_column_width=True,
                     output_format='PNG')
-            
+
         except Exception as e:
             st.error(f"Error loading sidebar logo: {str(e)}")
         st.markdown('</div>', unsafe_allow_html=True)
-
 
 # Initialize session state for lucky draw winners as a dictionary
 if 'lucky_draw_winners' not in st.session_state:
@@ -242,6 +237,12 @@ if 'lucky_draw_winners' not in st.session_state:
 
 if 'all_lucky_draw_winners' not in st.session_state:
     st.session_state.all_lucky_draw_winners = set()
+
+if 'correct_answers' not in st.session_state:
+    st.session_state.correct_answers = {}
+
+if 'guesses_file' not in st.session_state:
+    st.session_state.guesses_file = None
 
 # Streamlit app layout with custom styling
 st.set_page_config(page_title="AESGC Race Predictor Pro",
@@ -289,7 +290,7 @@ with st.sidebar:
     guesses_file = st.file_uploader("Upload Participant Guesses File", type=["csv"])
 
     st.header("Enter Correct Answers")
-    correct_answers = {}
+    correct_answers = st.session_state.correct_answers
     valid_race_count = 0
     MAX_POINTS_PER_RACE = 20
     MAX_TOTAL_POINTS = 0  # Will calculate based on valid races and opts
@@ -319,7 +320,7 @@ with st.sidebar:
             with col1:
                 correct_answers[f"Race{race_num}_1st"] = st.text_input(
                     "1st",
-                    value="0",
+                    value=correct_answers.get(f"Race{race_num}_1st", "0"),
                     key=f"first_{race_num}",
                     help=f"Enter horse number for 1st place in Race {race_num}"
                 )
@@ -327,7 +328,7 @@ with st.sidebar:
             with col2:
                 correct_answers[f"Race{race_num}_2nd"] = st.text_input(
                     "2nd",
-                    value="0",
+                    value=correct_answers.get(f"Race{race_num}_2nd", "0"),
                     key=f"second_{race_num}",
                     help=f"Enter horse number for 2nd place in Race {race_num}"
                 )
@@ -335,7 +336,7 @@ with st.sidebar:
             with col3:
                 correct_answers[f"Race{race_num}_3rd"] = st.text_input(
                     "3rd",
-                    value="0",
+                    value=correct_answers.get(f"Race{race_num}_3rd", "0"),
                     key=f"third_{race_num}",
                     help=f"Enter horse number for 3rd place in Race {race_num}"
                 )
@@ -366,7 +367,7 @@ with st.sidebar:
             with opt_cols[idx]:
                 correct_answers[f"OPT{i}"] = st.text_input(
                     f"OPT{i}",
-                    value="0",
+                    value=correct_answers.get(f"OPT{i}", "0"),
                     key=f"opt_{i}",
                     help=f"Enter correct value for OPT{i}"
                 )
@@ -377,7 +378,15 @@ if valid_race_count == 0 and MAX_TOTAL_POINTS == 0:
     st.warning("No valid race results entered. Please input at least one non-zero value for any race or OPT.")
 else:
     if guesses_file:
+        st.session_state.guesses_file = guesses_file
         guesses_df = pd.read_csv(guesses_file)
+
+        # Convert data from float to integer
+        columns_to_convert = [f"Race{race_num}_{pos}" for race_num in range(2,8) for pos in ['1st', '2nd', '3rd']] + [f"OPT{i}" for i in range(1,8)]
+        for col in columns_to_convert:
+            if col in guesses_df.columns:
+                guesses_df[col] = pd.to_numeric(guesses_df[col], errors='coerce').fillna(0).astype(int)
+
         detailed_results_df = analyze_guesses(guesses_df, correct_answers)
 
         # Filter detailed_results_df to only include races and opts where correct answers are provided
@@ -415,7 +424,7 @@ else:
             if not race_df.empty:
                 race_points = race_df.groupby('Serial ID')['Points'].sum().reset_index()
                 # Exclude zero points
-                race_points = race_points[race_points['Points'] > 0]
+                race_points = race_points[race_points['Points'] > 11]
                 if not race_points.empty:
                     top_points = race_points['Points'].unique()
                     top_points.sort()
@@ -498,13 +507,13 @@ else:
                     st.success(f"Lucky Draw Winner for {category}: {winner}")
             else:
                 st.markdown(f"""
-                    <div style='background-color: #2a2a2a; 
-                              padding: 20px; 
-                              border-radius: 10px; 
+                    <div style='background-color: #2a2a2a;
+                              padding: 20px;
+                              border-radius: 10px;
                               border: 2px solid #dc3545;
                               margin: 10px 0;'>
-                        <h3 style='color: #dc3545; 
-                                 font-size: 20px; 
+                        <h3 style='color: #dc3545;
+                                 font-size: 20px;
                                  margin-bottom: 10px;'>
                             Winner in {category} category
                         </h3>
